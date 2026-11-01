@@ -1,22 +1,21 @@
-import React from "react";
+import { type Lang, STRINGS } from "../i18n";
 
-function Footer() {
+export default function Footer({ lang }: { lang: Lang }) {
+  const t = STRINGS[lang];
+
   return (
     <footer className="footer">
-      <div className="content has-text-centered">
-        <p>
-          <strong>Cuarenta</strong> is made with ♥ by{" "}
-          <a href="https://sienaguerrero.com">Siena Maria Guerrero</a>. The
-          source code can be found on{" "}
-          <a href="https://github.com/sienaguerrero/cuarenta">Github</a>.{" "}
+      <div className="faja" aria-hidden />
+      <div className="footer__inner">
+        <p className="footer__dedication" lang="es">
+          "Cuarenta" está dedicada a mis abuelos, que dejaron su tierra natal para dar una mejor vida a sus hijos (y
+          nietos).
         </p>
-        <div>
-          "Cuarenta" está dedicada a mis abuelos, que dejaron su tierra natal
-          para dar una mejor vida a sus hijos (y nietos).
-        </div>
+        <p className="footer__credit">
+          <strong>Cuarenta</strong>. {t.madeBy} <a href="https://sienaguerrero.com">Siena Maria Guerrero</a>.{" "}
+          {t.sourceOn} <a href="https://github.com/sienaguerrero/cuarenta">GitHub</a>.
+        </p>
       </div>
     </footer>
   );
 }
-
-export default Footer;
