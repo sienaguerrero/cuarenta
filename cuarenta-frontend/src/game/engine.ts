@@ -51,13 +51,6 @@ export interface ScoreEvent {
 
 type NewEvent = Omit<ScoreEvent, "id">;
 
-export interface PlayRecord {
-  player: PlayerId;
-  card: Card;
-  taken: Card[];
-  events: ScoreEvent[];
-}
-
 export interface HandResult {
   cards: [number, number];
   leftover: number;
@@ -81,7 +74,6 @@ export interface GameState {
   rondas: { player: PlayerId; rank: Rank }[];
   events: ScoreEvent[];
   nextEventId: number;
-  lastPlay: PlayRecord | null;
   handResult: HandResult | null;
   chicaWinner: PlayerId | null;
   mesaWinner: PlayerId | null;
@@ -117,7 +109,6 @@ export function newMesa(firstDealer: PlayerId, rng: Rng): GameState {
       rondas: [],
       events: [],
       nextEventId: 1,
-      lastPlay: null,
       handResult: null,
       chicaWinner: null,
       mesaWinner: null,
@@ -158,7 +149,6 @@ function startHand(state: GameState, rng: Rng): GameState {
     deal: 0,
     rondas: [],
     events: [],
-    lastPlay: null,
     handResult: null,
   };
   dealRound(s);
@@ -209,8 +199,8 @@ function dealRound(s: GameState) {
         return;
       }
       if (n === 3) {
-        s.rondas.push({ player: p, rank });
         const blocked = s.scores[p] >= RONDA_LIMIT;
+        if (!blocked) s.rondas.push({ player: p, rank });
         emit(s, { kind: "ronda", player: p, points: blocked ? 0 : 4, blocked: blocked || undefined, rank });
         if (!blocked) award(s, p, 4);
       }
@@ -246,28 +236,17 @@ function subsetsSummingTo(cards: Card[], target: number): Card[][] {
   return out;
 }
 
-export function capturesFor(
-  card: Pick<Card, "rank">,
-  table: Card[],
-  lastDropId: string | null,
-): Capture[] {
+export function capturesFor(card: Pick<Card, "rank">, table: Card[]): Capture[] {
   const options: Capture[] = [];
   const escalera = escaleraFrom(card.rank, table);
 
-  const matches = table.filter((t) => t.rank === card.rank);
-  if (matches.length > 0) {
-    const pick = matches.find((m) => m.id === lastDropId) ?? matches[0];
-    options.push({ kind: "match", base: [pick.id], escalera });
-  }
+  const match = table.find((t) => t.rank === card.rank);
+  if (match) options.push({ kind: "match", base: [match.id], escalera });
 
   if (card.rank <= 7) {
-    const seen = new Set<string>();
     const addends = table.filter((t) => t.rank < card.rank);
     for (const combo of subsetsSummingTo(addends, card.rank)) {
       if (combo.length < 2) continue;
-      const key = combo.map((c) => c.rank).join("+");
-      if (seen.has(key)) continue;
-      seen.add(key);
       options.push({ kind: "sum", base: combo.map((c) => c.id), escalera });
     }
   }
@@ -277,9 +256,8 @@ export function capturesFor(
 
 export function legalMoves(s: GameState): Move[] {
   if (s.phase !== "playing") return [];
-  const lastDropId = s.lastDrop?.cardId ?? null;
   return s.hands[s.turn].flatMap((card): Move[] => {
-    const options = capturesFor(card, s.table, lastDropId);
+    const options = capturesFor(card, s.table);
     return options.length > 0
       ? options.map((capture) => ({ cardId: card.id, capture }))
       : [{ cardId: card.id, capture: null }];
@@ -320,7 +298,7 @@ export function evaluatePlay(
   const drop = s.lastDrop;
   const events: NewEvent[] = [];
 
-  if (capture.kind === "match" && drop && drop.player !== player && capture.base[0] === drop.cardId) {
+  if (capture.kind === "match" && drop && capture.base[0] === drop.cardId) {
     const enRonda = s.rondas.some((r) => r.player === drop.player && r.rank === card.rank);
     if (enRonda && score < RONDA_LIMIT) {
       events.push({ kind: "caidaEnRonda", player, points: 10 });
@@ -348,7 +326,7 @@ export function applyMove(state: GameState, move: Move): GameState {
   const card = state.hands[p].find((c) => c.id === move.cardId);
   if (!card) throw new Error(`${move.cardId} is not in the hand of player ${p}`);
 
-  const options = capturesFor(card, state.table, state.lastDrop?.cardId ?? null);
+  const options = capturesFor(card, state.table);
   let capture: Capture | null = null;
   if (options.length > 0) {
     capture = (move.capture && options.find((o) => sameCapture(o, move.capture!))) || null;
@@ -368,8 +346,7 @@ export function applyMove(state: GameState, move: Move): GameState {
     s.lastDrop = { cardId: card.id, player: p };
   }
 
-  const events = outcome.events.map((e) => emit(s, e));
-  s.lastPlay = { player: p, card, taken: outcome.taken, events };
+  for (const e of outcome.events) emit(s, e);
   if (outcome.points > 0) award(s, p, outcome.points);
   if (s.phase !== "playing") return s;
 
@@ -401,6 +378,7 @@ function endHand(s: GameState) {
     winner = cards[0] === cards[1] ? nonDealer : cards[0] > cards[1] ? 0 : 1;
     points = 2;
   }
+  points = Math.min(points, WIN - s.scores[winner]);
 
   s.phase = "handOver";
   const event = emit(s, { kind: "carton", player: winner, points, cards: cards[winner] });

@@ -36,7 +36,7 @@ function rest(used: Card[]): Card[] {
 describe("capturesFor", () => {
   it("runs an escalera up from a matched card and stops at the gap", () => {
     const table = cards("2H", "3S", "4D", "5C", "7H", "JS");
-    const [match] = capturesFor(parseCard("2C"), table, null);
+    const [match] = capturesFor(parseCard("2C"), table);
     expect(match.kind).toBe("match");
     expect(match.base).toEqual(["2H"]);
     expect(match.escalera).toEqual(["3S", "4D", "5C"]);
@@ -44,33 +44,28 @@ describe("capturesFor", () => {
 
   it("adds number cards and runs the escalera from the played rank, J after 7", () => {
     const table = cards("2H", "3S", "4D", "5C", "7H", "JS");
-    const sums = capturesFor(parseCard("6C"), table, null);
+    const sums = capturesFor(parseCard("6C"), table);
     expect(sums.map((o) => o.base)).toContainEqual(["2H", "4D"]);
     for (const o of sums) expect(o.escalera).toEqual(["7H", "JS"]);
   });
 
   it("offers a match or a sum, never both together", () => {
     const table = cards("AH", "2S", "3D", "4C");
-    const options = capturesFor(parseCard("4H"), table, null);
+    const options = capturesFor(parseCard("4H"), table);
     const kinds = options.map((o) => `${o.kind}:${o.base.join("+")}`);
     expect(kinds).toEqual(["match:4C", "sum:AH+3D"]);
   });
 
   it("sums three or more cards", () => {
-    const options = capturesFor(parseCard("7S"), cards("AH", "2S", "4D"), null);
+    const options = capturesFor(parseCard("7S"), cards("AH", "2S", "4D"));
     expect(options).toHaveLength(1);
     expect(options[0].base).toEqual(["AH", "2S", "4D"]);
   });
 
   it("never sums face cards and never runs past the king", () => {
-    expect(capturesFor(parseCard("KS"), cards("JH", "2S"), null)).toEqual([]);
-    const [match] = capturesFor(parseCard("KS"), cards("KH", "AS"), null);
+    expect(capturesFor(parseCard("KS"), cards("JH", "2S"))).toEqual([]);
+    const [match] = capturesFor(parseCard("KS"), cards("KH", "AS"));
     expect(match.escalera).toEqual([]);
-  });
-
-  it("prefers the card just dropped when two of the rank are on the table", () => {
-    const [match] = capturesFor(parseCard("5S"), cards("5H", "5D"), "5D");
-    expect(match.base).toEqual(["5D"]);
   });
 });
 
@@ -83,7 +78,7 @@ describe("scoring plays", () => {
       scores: [0, 0],
     });
     const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "5S")!);
-    expect(next.lastPlay?.events.map((e) => e.kind)).toEqual(["caida"]);
+    expect(next.events.map((e) => e.kind)).toEqual(["caida"]);
     expect(next.scores[YOU]).toBe(2);
   });
 
@@ -95,7 +90,7 @@ describe("scoring plays", () => {
       scores: [10, 0],
     });
     const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "5S")!);
-    expect(next.lastPlay?.events.map((e) => e.kind)).toEqual(["caida", "limpia"]);
+    expect(next.events.map((e) => e.kind)).toEqual(["caida", "limpia"]);
     expect(next.scores[YOU]).toBe(14);
   });
 
@@ -106,7 +101,7 @@ describe("scoring plays", () => {
       lastDrop: { cardId: "3D", player: LUCHO },
     });
     const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "5S")!);
-    expect(next.lastPlay?.events.map((e) => e.kind)).toEqual(["limpia"]);
+    expect(next.events.map((e) => e.kind)).toEqual(["limpia"]);
   });
 
   it("does not count limpia at 38, but a caída still wins", () => {
@@ -118,7 +113,7 @@ describe("scoring plays", () => {
       chicas: [1, 0],
     });
     const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "5S")!);
-    const limpia = next.lastPlay?.events.find((e) => e.kind === "limpia");
+    const limpia = next.events.find((e) => e.kind === "limpia");
     expect(limpia).toMatchObject({ points: 0, blocked: true });
     expect(next.scores[YOU]).toBe(40);
     expect(next.phase).toBe("mesaOver");
@@ -145,7 +140,7 @@ describe("scoring plays", () => {
       rondas: [{ player: LUCHO, rank: 7 }],
     });
     const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "7S")!);
-    expect(next.lastPlay?.events).toMatchObject([{ kind: "caidaEnRonda", points: 10 }]);
+    expect(next.events).toMatchObject([{ kind: "caidaEnRonda", points: 10 }]);
   });
 
   it("forces a capture when one is available", () => {
@@ -177,6 +172,19 @@ describe("dealing", () => {
     expect(late.scores[YOU]).toBe(30);
   });
 
+  it("does not pay caída en ronda on a ronda that did not count", () => {
+    const youHand = cards("7S", "7H", "7D", "KC", "AS");
+    const luchoHand = cards("7C", "3H", "5D", "6C", "2S");
+    const deck = [...luchoHand, ...youHand, ...rest([...youHand, ...luchoHand, ...cards("JS")])];
+    const s = stateWith({ hands: [cards("JS"), []], turn: YOU, deck, table: [], dealer: YOU, scores: [32, 0] });
+    let g = applyMove(s, { cardId: "JS", capture: null });
+    expect(g.events.find((e) => e.kind === "ronda")).toMatchObject({ player: YOU, blocked: true });
+    g = applyMove(g, { cardId: "2S", capture: null });
+    g = applyMove(g, { cardId: "7H", capture: null });
+    g = applyMove(g, legalMoves(g).find((m) => m.cardId === "7C")!);
+    expect(g.events.at(-1)).toMatchObject({ kind: "caida", player: LUCHO, points: 2 });
+  });
+
   it("gives the chica to a doble ronda", () => {
     const youHand = cards("QS", "QH", "QD", "QC", "AS");
     const luchoHand = cards("2S", "3H", "5D", "6C", "7S");
@@ -197,13 +205,13 @@ describe("cartón", () => {
     expect(cartonPoints(30)).toBe(16);
   });
 
-  function lastPlayOfHand(capturedYou: number, capturedLucho: number, dealer = LUCHO) {
-    const pool = makeDeck().filter((c) => c.id !== "KS");
+  function lastPlayOfHand(capturedYou: number, capturedLucho: number, dealer = LUCHO, table: Card[] = []) {
+    const pool = rest([parseCard("KS"), ...table]);
     return stateWith({
       deck: [],
       dealer,
       hands: [cards("KS"), []],
-      table: [],
+      table,
       turn: YOU,
       captured: [pool.slice(0, capturedYou), pool.slice(capturedYou, capturedYou + capturedLucho)],
       scores: [0, 12],
@@ -218,8 +226,17 @@ describe("cartón", () => {
   });
 
   it("gives the 20 to 20 tie to the player who did not deal", () => {
-    const end = applyMove(lastPlayOfHand(20, 19, LUCHO), { cardId: "KS", capture: null });
-    expect(end.handResult?.event).toMatchObject({ player: YOU, points: 6, cards: 20 });
+    const s = lastPlayOfHand(18, 20, YOU, cards("KH"));
+    const end = applyMove(s, legalMoves(s)[0]);
+    expect(end.handResult).toMatchObject({ cards: [20, 20], leftover: 0 });
+    expect(end.handResult?.event).toMatchObject({ player: LUCHO, points: 6, cards: 20 });
+  });
+
+  it("only shows the cartón points that were still needed to reach 40", () => {
+    const end = applyMove({ ...lastPlayOfHand(22, 17), scores: [36, 12] }, { cardId: "KS", capture: null });
+    expect(end.handResult?.event).toMatchObject({ player: YOU, points: 4, cards: 22 });
+    expect(end.scores[YOU]).toBe(40);
+    expect(end.phase).toBe("chicaOver");
   });
 });
 
@@ -255,6 +272,7 @@ describe("full games", () => {
           const all = [...s.deck, ...s.hands[0], ...s.hands[1], ...s.table, ...s.captured[0], ...s.captured[1]];
           expect(new Set(all.map((c) => c.id)).size).toBe(40);
           expect(all).toHaveLength(40);
+          expect(new Set(s.table.map((c) => c.rank)).size).toBe(s.table.length);
         }
         expect(plays).toBeLessThan(5000);
       }

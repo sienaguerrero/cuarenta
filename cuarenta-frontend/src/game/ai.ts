@@ -1,4 +1,4 @@
-import { type Card, type Rng, RANKS, makeDeck } from "./cards";
+import { type Card, type Rank, type Rng, RANKS, makeDeck } from "./cards";
 import {
   type GameState,
   type Move,
@@ -23,6 +23,18 @@ export function unseenBy(s: GameState, player: PlayerId): Card[] {
   return makeDeck().filter((c) => !known.has(c.id));
 }
 
+interface Unseen {
+  total: number;
+  ofRank: Map<Rank, number>;
+}
+
+function countUnseen(s: GameState, player: PlayerId): Unseen {
+  const unseen = unseenBy(s, player);
+  const ofRank = new Map<Rank, number>();
+  for (const c of unseen) ofRank.set(c.rank, (ofRank.get(c.rank) ?? 0) + 1);
+  return { total: unseen.length, ofRank };
+}
+
 function chanceToHold(unseen: number, ofRank: number, handSize: number): number {
   let miss = 1;
   for (let i = 0; i < handSize; i++) miss *= Math.max(0, unseen - ofRank - i) / (unseen - i);
@@ -32,6 +44,7 @@ function chanceToHold(unseen: number, ofRank: number, handSize: number): number 
 function opponentThreat(
   s: GameState,
   me: PlayerId,
+  unseen: Unseen,
   tableAfter: Card[],
   dropped: Card | null,
 ): number {
@@ -45,16 +58,15 @@ function opponentThreat(
   }
   if (tableAfter.length === 0) return 0;
 
-  const unseen = unseenBy(s, me);
   const oppScore = s.scores[opp];
   const myRonda = dropped && s.rondas.some((r) => r.player === me && r.rank === dropped.rank);
+  const dropId = caidaOpen && dropped ? dropped.id : null;
 
   const threats = RANKS.map((rank) => {
-    const ofRank = unseen.filter((c) => c.rank === rank).length;
+    const ofRank = unseen.ofRank.get(rank) ?? 0;
     if (ofRank === 0) return { p: 0, gain: 0 };
-    const dropId = caidaOpen && dropped ? dropped.id : null;
     let gain = 0;
-    for (const option of capturesFor({ rank }, tableAfter, dropId)) {
+    for (const option of capturesFor({ rank }, tableAfter)) {
       const taken = option.base.length + option.escalera.length;
       let points = 0;
       if (dropId && option.kind === "match" && option.base[0] === dropId) {
@@ -64,7 +76,7 @@ function opponentThreat(
       const value = oppScore + points >= WIN ? WINNING_PLAY / 2 : points + CARD_VALUE * (taken + 1);
       gain = Math.max(gain, value);
     }
-    return { p: chanceToHold(unseen.length, ofRank, handSize), gain };
+    return { p: chanceToHold(unseen.total, ofRank, handSize), gain };
   }).sort((a, b) => b.gain - a.gain);
 
   let expected = 0;
@@ -80,6 +92,7 @@ export function chooseMove(s: GameState, rng: Rng): Move {
   const me = s.turn;
   const moves = legalMoves(s);
   if (moves.length === 0) throw new Error("No legal moves");
+  const unseen = countUnseen(s, me);
 
   let best = moves[0];
   let bestValue = -Infinity;
@@ -89,7 +102,7 @@ export function chooseMove(s: GameState, rng: Rng): Move {
     let value = outcome.points;
     if (move.capture) value += CARD_VALUE * (outcome.taken.length + 1);
     if (s.scores[me] + outcome.points >= WIN) value += WINNING_PLAY;
-    value -= RISK_WEIGHT * opponentThreat(s, me, outcome.tableAfter, move.capture ? null : card);
+    value -= RISK_WEIGHT * opponentThreat(s, me, unseen, outcome.tableAfter, move.capture ? null : card);
     value += rng() * 0.15;
     if (value > bestValue) {
       bestValue = value;

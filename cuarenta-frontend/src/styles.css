@@ -576,6 +576,9 @@ a {
   font-size: 13px;
   font-weight: 600;
 }
+.toast__group + .toast__group {
+  margin-top: 10px;
+}
 .toast__who {
   margin-top: 4px;
   font-size: 11px;
