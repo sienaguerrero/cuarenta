@@ -60,7 +60,6 @@ const es = {
   choose: "¿Qué te llevas?",
   cancel: "Cancelar",
   takes: (n: number) => (n === 1 ? "1 carta" : `${n} cartas`),
-  stays: "Se queda en la mesa",
   notCounted: "no cuenta",
   limitRonda: "Desde 30, la ronda no cuenta",
   limitLimpia: "A los 38, la limpia no cuenta",
@@ -78,7 +77,6 @@ const es = {
   zapateroYou: "Te fuiste de zapatero: ni un perro en toda la chica.",
   zapateroLucho: "Don Lucho se fue de zapatero: ni un perro en toda la chica.",
   anotherMesa: "Otra mesa",
-  score: (you: number, lucho: number) => `Tú ${you}, Don Lucho ${lucho}`,
   madeBy: "Hecho con ♥ por",
   sourceOn: "El código está en",
 };
@@ -118,7 +116,6 @@ const en: Strings = {
   choose: "What do you take?",
   cancel: "Cancel",
   takes: (n) => (n === 1 ? "1 card" : `${n} cards`),
-  stays: "Stays on the table",
   notCounted: "doesn't count",
   limitRonda: "From 30 up, rondas don't count",
   limitLimpia: "At 38, limpias don't count",
@@ -136,7 +133,6 @@ const en: Strings = {
   zapateroYou: "You're the zapatero: not one perro all chica.",
   zapateroLucho: "Don Lucho is the zapatero: not one perro all chica.",
   anotherMesa: "Another mesa",
-  score: (you, lucho) => `You ${you}, Don Lucho ${lucho}`,
   madeBy: "Made with ♥ by",
   sourceOn: "The source code is on",
 };

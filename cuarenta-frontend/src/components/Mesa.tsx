@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Card, byRank } from "../game/cards";
 import { chooseMove } from "../game/ai";
 import {
   type Capture,
+  type EventKind,
   type GameState,
   type Move,
   type PlayerId,
@@ -40,7 +41,7 @@ interface Option {
 }
 
 function optionsFor(game: GameState, card: Card): Option[] {
-  return capturesFor(card, game.table, game.lastDrop?.cardId ?? null)
+  return capturesFor(card, game.table)
     .map((capture) => {
       const outcome = evaluatePlay(game, game.turn, card, capture);
       return {
@@ -53,16 +54,42 @@ function optionsFor(game: GameState, card: Card): Option[] {
     .sort((a, b) => b.points - a.points || b.ids.length - a.ids.length);
 }
 
+const MOODS: [EventKind[], Mood, Mood][] = [
+  [["dobleRonda"], "myDobleRonda", "yourDobleRonda"],
+  [["caidaEnRonda"], "myCaidaEnRonda", "yourCaidaEnRonda"],
+  [["caida", "limpia"], "myCaidaLimpia", "yourCaidaLimpia"],
+  [["caida"], "myCaida", "yourCaida"],
+  [["limpia"], "myLimpia", "yourLimpia"],
+  [["ronda"], "myRonda", "yourRonda"],
+];
+
 function moodFor(events: ScoreEvent[]): Mood | null {
-  const kinds = new Set(events.map((e) => e.kind));
-  const who = events[0].player === LUCHO ? "my" : "your";
-  if (kinds.has("dobleRonda")) return who === "my" ? "myDobleRonda" : "yourDobleRonda";
-  if (kinds.has("caidaEnRonda")) return who === "my" ? "myCaidaEnRonda" : "yourCaidaEnRonda";
-  if (kinds.has("caida") && kinds.has("limpia")) return who === "my" ? "myCaidaLimpia" : "yourCaidaLimpia";
-  if (kinds.has("caida")) return who === "my" ? "myCaida" : "yourCaida";
-  if (kinds.has("limpia")) return who === "my" ? "myLimpia" : "yourLimpia";
-  if (kinds.has("ronda")) return who === "my" ? "myRonda" : "yourRonda";
+  for (const [kinds, mine, yours] of MOODS) {
+    for (const p of [LUCHO, YOU]) {
+      if (kinds.every((k) => events.some((e) => e.player === p && e.kind === k))) return p === LUCHO ? mine : yours;
+    }
+  }
   return null;
+}
+
+function byPlayer(events: ScoreEvent[]): { player: PlayerId; events: ScoreEvent[] }[] {
+  const groups: { player: PlayerId; events: ScoreEvent[] }[] = [];
+  for (const e of events) {
+    const group = groups.find((g) => g.player === e.player);
+    if (group) group.events.push(e);
+    else groups.push({ player: e.player, events: [e] });
+  }
+  return groups;
+}
+
+function ChicaDots({ won, label }: { won: number; label: string }) {
+  return (
+    <span className="seat__chicas" aria-label={`${label}: ${won}`}>
+      {[0, 1].map((i) => (
+        <span key={i} className={`chica-dot${i < won ? " chica-dot--won" : ""}`} />
+      ))}
+    </span>
+  );
 }
 
 function maxEventId(game: GameState) {
@@ -86,17 +113,18 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
   const [toast, setToast] = useState<{ key: number; events: ScoreEvent[] } | null>(null);
   const [speech, setSpeech] = useState<{ key: number; line: Line } | null>(null);
   const [showResult, setShowResult] = useState(initial.phase !== "playing");
-  const seen = useRef(maxEventId(initial));
+  const seen = useRef(resumed ? maxEventId(initial) : 0);
   const speechKey = useRef(0);
 
-  const say = (mood: Mood) => {
+  const say = useCallback((mood: Mood, onlyIfQuiet = false) => {
     speechKey.current += 1;
-    setSpeech({ key: speechKey.current, line: pickLine(mood, Math.random) });
-  };
+    const next = { key: speechKey.current, line: pickLine(mood, Math.random) };
+    setSpeech((current) => (onlyIfQuiet && current ? current : next));
+  }, []);
 
   useEffect(() => {
     say(resumed ? "resume" : "greet");
-  }, [resumed]);
+  }, [resumed, say]);
 
   useEffect(() => {
     onChange(game);
@@ -104,14 +132,14 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
 
   useEffect(() => {
     if (game.phase !== "playing" || game.turn !== LUCHO || pending) return;
-    if (!speech && Math.random() < 0.18) say("think");
+    if (Math.random() < 0.18) say("think", true);
     const id = setTimeout(() => {
       const move = chooseMove(game, Math.random);
       const card = game.hands[LUCHO].find((c) => c.id === move.cardId)!;
       setPending({ move, player: LUCHO, card });
     }, LUCHO_DELAY);
     return () => clearTimeout(id);
-  }, [game, pending]);
+  }, [game, pending, say]);
 
   useEffect(() => {
     if (!pending) return;
@@ -150,7 +178,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
       setShowResult(true);
     }, fresh.length > 0 ? RESULT_DELAY : 300);
     return () => clearTimeout(id);
-  }, [game]);
+  }, [game, say]);
 
   useEffect(() => {
     if (!toast) return;
@@ -164,10 +192,17 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
     return () => clearTimeout(id);
   }, [speech]);
 
+  const closeChooser = () => {
+    setChoosing(null);
+    setPreview([]);
+  };
+
   useEffect(() => {
     if (!choosing) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setChoosing(null);
+      if (e.key !== "Escape") return;
+      setChoosing(null);
+      setPreview([]);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -184,8 +219,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
   );
 
   const play = (move: Move, card: Card) => {
-    setChoosing(null);
-    setPreview([]);
+    closeChooser();
     setPending({ move, player: YOU, card });
   };
 
@@ -217,11 +251,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
         <div className="seat__head">
           <span className="seat__name">{name(p)}</span>
           {game.dealer === p && <span className="chip chip--dealer">{t.deals}</span>}
-          <span className="seat__chicas" aria-label={`${t.chicas}: ${game.chicas[p]}`}>
-            {[0, 1].map((i) => (
-              <span key={i} className={`chica-dot${i < game.chicas[p] ? " chica-dot--won" : ""}`} />
-            ))}
-          </span>
+          <ChicaDots won={game.chicas[p]} label={t.chicas} />
         </div>
         <div className="seat__score">
           <span className="seat__points">
@@ -295,14 +325,18 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
           </div>
           {toast && (
             <div key={toast.key} className="toast" role="status">
-              {toast.events.map((e) => (
-                <div key={e.id} className={`toast__line${e.blocked ? " toast__line--blocked" : ""}`}>
-                  <span className="toast__label">{EVENT_LABELS[e.kind]}</span>
-                  <span className="toast__pts">{e.blocked ? t.notCounted : `+${e.points}`}</span>
-                  {lang === "en" && <span className="toast__gloss">{EVENT_GLOSS[e.kind]}</span>}
+              {byPlayer(toast.events).map((group) => (
+                <div key={group.player} className="toast__group">
+                  {group.events.map((e) => (
+                    <div key={e.id} className={`toast__line${e.blocked ? " toast__line--blocked" : ""}`}>
+                      <span className="toast__label">{EVENT_LABELS[e.kind]}</span>
+                      <span className="toast__pts">{e.blocked ? t.notCounted : `+${e.points}`}</span>
+                      {lang === "en" && <span className="toast__gloss">{EVENT_GLOSS[e.kind]}</span>}
+                    </div>
+                  ))}
+                  <div className="toast__who">{name(group.player)}</div>
                 </div>
               ))}
-              <div className="toast__who">{name(toast.events[0].player)}</div>
             </div>
           )}
         </div>
@@ -317,7 +351,8 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
           <div className="hand hand--you">
             {myHand.map((c) => {
               const options = myTurn ? optionsFor(game, c) : [];
-              const tag = options[0]?.kinds.includes("caida") ? "caida" : options.length ? "takes" : null;
+              const caida = options[0]?.kinds.some((k) => k === "caida" || k === "caidaEnRonda");
+              const tag = caida ? "caida" : options.length ? "takes" : null;
               return (
                 <button
                   key={c.id}
@@ -373,7 +408,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
               );
             })}
           </div>
-          <button type="button" className="link-button" onClick={() => setChoosing(null)}>
+          <button type="button" className="link-button" onClick={closeChooser}>
             {t.cancel}
           </button>
         </div>
@@ -425,14 +460,10 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
               <div className="result__scores">
                 {[YOU, LUCHO].map((p) => (
                   <div key={p} className="result__score">
-                    <span className="result__name">{name(p as PlayerId)}</span>
-                    <span className="result__points">{game.scores[p as PlayerId]}</span>
-                    <Tally score={game.scores[p as PlayerId]} />
-                    <span className="seat__chicas" aria-label={`${t.chicas}: ${game.chicas[p as PlayerId]}`}>
-                      {[0, 1].map((i) => (
-                        <span key={i} className={`chica-dot${i < game.chicas[p as PlayerId] ? " chica-dot--won" : ""}`} />
-                      ))}
-                    </span>
+                    <span className="result__name">{name(p)}</span>
+                    <span className="result__points">{game.scores[p]}</span>
+                    <Tally score={game.scores[p]} />
+                    <ChicaDots won={game.chicas[p]} label={t.chicas} />
                   </div>
                 ))}
               </div>

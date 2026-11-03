@@ -87,8 +87,9 @@ export default function HowToPlayModal({ open, lang, onClose }: Props) {
           <p>No hay caída en la primera jugada de un reparto.</p>
           <h3>Los 30 y los 38</h3>
           <p>
-            Desde los 30 puntos la ronda ya no cuenta. A los 38 la limpia ya no cuenta: hay que cerrar con caída o con
-            cartón.
+            Desde los 30 puntos la ronda ya no cuenta, y caerle a una ronda vale 2, como cualquier caída. Si la ronda
+            de tu rival no contó, caerle tampoco vale 10. A los 38 la limpia ya no cuenta: hay que cerrar con caída o
+            con cartón.
           </p>
           <h3>Ganar</h3>
           <p>
@@ -152,8 +153,9 @@ export default function HowToPlayModal({ open, lang, onClose }: Props) {
           <p>The first play of a deal can't be a caída.</p>
           <h3>The 30 and 38 rules</h3>
           <p>
-            From 30 points up, rondas don't count. At 38, limpias don't count either: you have to finish with a caída or
-            the cartón.
+            From 30 points up, rondas don't count, and catching a ronda card is a plain caída worth 2. If your rival's
+            ronda didn't count, catching it isn't worth 10 either. At 38, limpias don't count: you have to finish with
+            a caída or the cartón.
           </p>
           <h3>Winning</h3>
           <p>
