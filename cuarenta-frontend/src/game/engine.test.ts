@@ -192,7 +192,7 @@ describe("dealing", () => {
     expect(late.scores[YOU]).toBe(30);
   });
 
-  it("does not pay caída en ronda on a ronda that did not count", () => {
+  it("pays caída en ronda on a ronda that did not count", () => {
     const youHand = cards("7S", "7H", "7D", "KC", "AS");
     const luchoHand = cards("7C", "3H", "5D", "6C", "2S");
     const deck = [...luchoHand, ...youHand, ...rest([...youHand, ...luchoHand, ...cards("JS")])];
@@ -202,7 +202,7 @@ describe("dealing", () => {
     g = applyMove(g, { cardId: "2S", capture: null });
     g = applyMove(g, { cardId: "7H", capture: null });
     g = applyMove(g, legalMoves(g).find((m) => m.cardId === "7C")!);
-    expect(g.events.at(-1)).toMatchObject({ kind: "caida", player: LUCHO, points: 2 });
+    expect(g.events.at(-1)).toMatchObject({ kind: "caidaEnRonda", player: LUCHO, points: 10 });
   });
 
   it("gives the chica to a doble ronda", () => {
