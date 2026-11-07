@@ -1,6 +1,6 @@
 {
   "name": "cuarenta",
-  "version": "2.0.0",
+  "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -26,5 +26,8 @@
     "typescript-eslint": "8.72.1",
     "vite": "7.3.7",
     "vitest": "4.1.12"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
