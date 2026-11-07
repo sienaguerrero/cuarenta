@@ -6,6 +6,14 @@ updates:
       interval: weekly
     commit-message:
       prefix: build(deps)
+    groups:
+      react:
+        patterns: ["react", "react-dom", "@types/react", "@types/react-dom"]
+      vite:
+        patterns: ["vite", "@vitejs/plugin-react"]
+    ignore:
+      - dependency-name: typescript
+        versions: [">=6.1.0"]
 
   - package-ecosystem: github-actions
     directory: /
