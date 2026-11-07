@@ -192,21 +192,23 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
     return () => clearTimeout(id);
   }, [speech]);
 
-  const closeChooser = () => {
+  const handRef = useRef<HTMLDivElement>(null);
+  const chooserOpener = useRef<HTMLButtonElement | null>(null);
+
+  const closeChooser = useCallback(() => {
     setChoosing(null);
     setPreview([]);
-  };
+    chooserOpener.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!choosing) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setChoosing(null);
-      setPreview([]);
+      if (e.key === "Escape") closeChooser();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [choosing]);
+  }, [choosing, closeChooser]);
 
   const myTurn = game.phase === "playing" && game.turn === YOU && !pending;
   const myHand = useMemo(
@@ -219,15 +221,20 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
   );
 
   const play = (move: Move, card: Card) => {
-    closeChooser();
+    setChoosing(null);
+    setPreview([]);
     setPending({ move, player: YOU, card });
+    handRef.current?.focus();
   };
 
-  const pick = (card: Card) => {
+  const pick = (card: Card, button: HTMLButtonElement) => {
     if (!myTurn) return;
     const options = optionsFor(game, card);
     if (options.length <= 1) play({ cardId: card.id, capture: options[0]?.capture ?? null }, card);
-    else setChoosing({ card, options });
+    else {
+      chooserOpener.current = button;
+      setChoosing({ card, options });
+    }
   };
 
   const hoverCard = (card: Card | null) => {
@@ -258,7 +265,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
             {score}
             <small> / 40</small>
           </span>
-          <Tally score={score} />
+          <Tally score={score} t={t} />
         </div>
         <div className="seat__meta">
           <span>
@@ -291,7 +298,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
         {seat(LUCHO)}
       </section>
 
-      <section className="rim" aria-label="Mesa">
+      <section className="rim" aria-label={t.table}>
         <div className="felt">
           <div className="felt__status">
             <span>{t.deal(Math.max(game.deal, 1), DEALS_PER_HAND)}</span>
@@ -348,7 +355,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
           <p className={`turn${myTurn ? " turn--you" : ""}`} aria-live="polite">
             {game.phase !== "playing" ? " " : myTurn ? t.yourTurn : pending?.player === YOU ? " " : t.luchoTurn}
           </p>
-          <div className="hand hand--you">
+          <div className="hand hand--you" ref={handRef} tabIndex={-1}>
             {myHand.map((c) => {
               const options = myTurn ? optionsFor(game, c) : [];
               const caida = options[0]?.kinds.some((k) => k === "caida" || k === "caidaEnRonda");
@@ -359,14 +366,14 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
                   type="button"
                   className={`hand__card${choosing?.card.id === c.id ? " hand__card--chosen" : ""}`}
                   disabled={!myTurn}
-                  onClick={() => pick(c)}
+                  onClick={(e) => pick(c, e.currentTarget)}
                   onMouseEnter={() => hoverCard(c)}
                   onMouseLeave={() => hoverCard(null)}
                   onFocus={() => hoverCard(c)}
                   onBlur={() => hoverCard(null)}
                 >
                   <CardFace card={c} lang={lang} />
-                  {tag && <span className={`hand__tag hand__tag--${tag}`}>{tag === "caida" ? "¡Caída!" : "+"}</span>}
+                  {tag && <span className={`hand__tag hand__tag--${tag}`}>{tag === "caida" ? t.caidaTag : "+"}</span>}
                 </button>
               );
             })}
@@ -462,7 +469,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
                   <div key={p} className="result__score">
                     <span className="result__name">{name(p)}</span>
                     <span className="result__points">{game.scores[p]}</span>
-                    <Tally score={game.scores[p]} />
+                    <Tally score={game.scores[p]} t={t} />
                     <ChicaDots won={game.chicas[p]} label={t.chicas} />
                   </div>
                 ))}
