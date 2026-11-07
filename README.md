@@ -19,7 +19,6 @@ npm run dev
 - `cuarenta-frontend/src/game/engine.ts`: the rules. Captures, caída, limpia, ronda, the 30 and 38 limits, cartón, chica, mesa, and zapatería.
 - `cuarenta-frontend/src/game/ai.ts`: Don Lucho. He weighs points and cards taken against the odds that you can catch what he leaves on the table.
 - `cuarenta-frontend/src/components/`: the table, cards, scoreboard, and rules pages.
-- `cuarenta-backend/`: an early socket.io stub for online play. The game doesn't use it yet.
 
 ## Rules
 
