@@ -200,7 +200,7 @@ function dealRound(s: GameState) {
       }
       if (n === 3) {
         const blocked = s.scores[p] >= RONDA_LIMIT;
-        if (!blocked) s.rondas.push({ player: p, rank });
+        s.rondas.push({ player: p, rank });
         emit(s, { kind: "ronda", player: p, points: blocked ? 0 : 4, blocked: blocked || undefined, rank });
         if (!blocked) award(s, p, 4);
       }
