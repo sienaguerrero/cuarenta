@@ -13,7 +13,7 @@ import {
   nextChica,
   nextHand,
 } from "./engine";
-import { chooseMove } from "./ai";
+import { chooseMove, unseenBy } from "./ai";
 
 const cards = (...ids: string[]): Card[] => ids.map(parseCard);
 
@@ -147,6 +147,26 @@ describe("scoring plays", () => {
     const s = stateWith({ hands: [cards("5S"), cards("2C")], table: cards("5H") });
     expect(() => applyMove(s, { cardId: "5S", capture: null })).toThrow();
   });
+
+  it("rejects a capture that is not one of the card's options", () => {
+    const s = stateWith({ hands: [cards("5S", "KD"), cards("2C")], table: cards("5H", "2H", "3D") });
+    expect(() => applyMove(s, { cardId: "5S", capture: { kind: "sum", base: ["5H"], escalera: [] } })).toThrow();
+    expect(() => applyMove(s, { cardId: "5S", capture: { kind: "match", base: ["2H"], escalera: [] } })).toThrow();
+    expect(() => applyMove(s, { cardId: "KD", capture: { kind: "match", base: ["5H"], escalera: [] } })).toThrow();
+  });
+
+  it("pays a capturer at 30 or more only 2 for a caída on a counted ronda", () => {
+    const s = stateWith({
+      hands: [cards("7S", "KD"), cards("2C")],
+      table: cards("7H", "QC"),
+      lastDrop: { cardId: "7H", player: LUCHO },
+      rondas: [{ player: LUCHO, rank: 7 }],
+      scores: [30, 0],
+    });
+    const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "7S")!);
+    expect(next.events).toMatchObject([{ kind: "caida", points: 2 }]);
+    expect(next.scores[YOU]).toBe(32);
+  });
 });
 
 describe("dealing", () => {
@@ -194,6 +214,43 @@ describe("dealing", () => {
     expect(dealt.scores[YOU]).toBe(40);
     expect(dealt.phase).toBe("chicaOver");
   });
+
+  it("allows no caída on the first play after a new deal", () => {
+    const youHand = cards("AS", "2S", "3S", "4S", "5S");
+    const luchoHand = cards("JC", "2H", "3H", "4H", "6H");
+    const deck = [...luchoHand, ...youHand, ...rest([...youHand, ...luchoHand, ...cards("JS")])];
+    const s = stateWith({ hands: [cards("JS"), []], turn: YOU, deck, table: [], dealer: YOU, scores: [0, 0] });
+    const dealt = applyMove(s, { cardId: "JS", capture: null });
+    expect(dealt.lastDrop).toBeNull();
+    expect(dealt.turn).toBe(LUCHO);
+    const next = applyMove(dealt, legalMoves(dealt).find((m) => m.cardId === "JC")!);
+    expect(next.events.map((e) => e.kind)).toEqual(["limpia"]);
+  });
+
+  it("announces a ronda on a later deal of the hand", () => {
+    const youHand = cards("6S", "6H", "6D", "KC", "AS");
+    const luchoHand = cards("2S", "3H", "5D", "JC", "7S");
+    const deck = [...luchoHand, ...youHand, ...rest([...youHand, ...luchoHand, ...cards("JS")]).slice(0, 10)];
+    const s = stateWith({ hands: [cards("JS"), []], turn: YOU, deck, table: [], dealer: YOU, scores: [0, 0], deal: 2 });
+    const dealt = applyMove(s, { cardId: "JS", capture: null });
+    expect(dealt.deal).toBe(3);
+    expect(dealt.events.find((e) => e.kind === "ronda")).toMatchObject({ player: YOU, points: 4, rank: 6 });
+    expect(dealt.scores[YOU]).toBe(4);
+  });
+
+  it("pays both rondas when the dealer and the other player each hold one", () => {
+    const youHand = cards("6S", "6H", "6D", "KC", "AS");
+    const luchoHand = cards("2S", "2H", "2D", "JC", "7S");
+    const deck = [...luchoHand, ...youHand, ...rest([...youHand, ...luchoHand, ...cards("JS")])];
+    const s = stateWith({ hands: [cards("JS"), []], turn: YOU, deck, table: [], dealer: YOU, scores: [0, 0] });
+    const dealt = applyMove(s, { cardId: "JS", capture: null });
+    const rondas = dealt.events.filter((e) => e.kind === "ronda");
+    expect(rondas).toMatchObject([
+      { player: LUCHO, points: 4, rank: 2 },
+      { player: YOU, points: 4, rank: 6 },
+    ]);
+    expect(dealt.scores).toEqual([4, 4]);
+  });
 });
 
 describe("cartón", () => {
@@ -225,6 +282,18 @@ describe("cartón", () => {
     expect(end.handResult?.event).toMatchObject({ player: LUCHO, points: 2 });
   });
 
+  it("gives a tie under 20 to the player who did not deal", () => {
+    const luchoDealt = applyMove(lastPlayOfHand(19, 19, LUCHO), { cardId: "KS", capture: null });
+    expect(luchoDealt.handResult?.event).toMatchObject({ player: YOU, points: 2 });
+    const youDealt = applyMove(lastPlayOfHand(19, 19, YOU), { cardId: "KS", capture: null });
+    expect(youDealt.handResult?.event).toMatchObject({ player: LUCHO, points: 2 });
+  });
+
+  it("scores 6 for 20 cards against 19", () => {
+    const end = applyMove(lastPlayOfHand(20, 19), { cardId: "KS", capture: null });
+    expect(end.handResult?.event).toMatchObject({ player: YOU, points: 6, cards: 20 });
+  });
+
   it("gives the 20 to 20 tie to the player who did not deal", () => {
     const s = lastPlayOfHand(18, 20, YOU, cards("KH"));
     const end = applyMove(s, legalMoves(s)[0]);
@@ -252,6 +321,59 @@ describe("chica and mesa", () => {
     expect(next.phase).toBe("mesaOver");
     expect(next.zapateria).toBe(true);
     expect(next.mesaWinner).toBe(YOU);
+  });
+
+  it("ends the mesa on a second chica", () => {
+    const s = stateWith({
+      hands: [cards("5S", "KD"), cards("2C")],
+      table: cards("5H"),
+      lastDrop: { cardId: "5H", player: LUCHO },
+      scores: [36, 20],
+      chicas: [1, 0],
+    });
+    const next = applyMove(s, legalMoves(s).find((m) => m.cardId === "5S")!);
+    expect(next.phase).toBe("mesaOver");
+    expect(next.zapateria).toBe(false);
+    expect(next.chicas).toEqual([2, 0]);
+    expect(next.mesaWinner).toBe(YOU);
+  });
+
+  it("ends the mesa on a doble ronda when the other player has under 10", () => {
+    const youHand = cards("QS", "QH", "QD", "QC", "AS");
+    const luchoHand = cards("2S", "3H", "5D", "6C", "7S");
+    const deck = [...luchoHand, ...youHand, ...rest([...youHand, ...luchoHand])];
+    const s = stateWith({ hands: [cards("JS"), []], turn: YOU, deck, table: [], dealer: YOU, scores: [12, 4] });
+    const dealt = applyMove(s, { cardId: "JS", capture: null });
+    expect(dealt.events.find((e) => e.kind === "dobleRonda")).toMatchObject({ player: YOU });
+    expect(dealt.phase).toBe("mesaOver");
+    expect(dealt.zapateria).toBe(true);
+    expect(dealt.mesaWinner).toBe(YOU);
+  });
+});
+
+describe("Don Lucho", () => {
+  it("does not count your own hand as unseen", () => {
+    const s = stateWith({
+      hands: [cards("5S", "KD"), cards("2C", "3C")],
+      table: cards("5H"),
+      captured: [cards("AS"), cards("AH")],
+    });
+    const unseen = unseenBy(s, LUCHO).map((c) => c.id);
+    expect(unseen).toHaveLength(40 - 5);
+    for (const id of ["2C", "3C", "5H", "AS", "AH"]) expect(unseen).not.toContain(id);
+    for (const id of ["5S", "KD"]) expect(unseen).toContain(id);
+  });
+
+  it("takes caída y limpia when it is on the table", () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const s = stateWith({
+        turn: LUCHO,
+        hands: [cards("2S", "3S"), cards("5C", "6S", "KD")],
+        table: cards("5H", "6D"),
+        lastDrop: { cardId: "5H", player: YOU },
+      });
+      expect(chooseMove(s, mulberry32(seed)).cardId).toBe("5C");
+    }
   });
 });
 
