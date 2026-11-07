@@ -265,7 +265,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
             {score}
             <small> / 40</small>
           </span>
-          <Tally score={score} />
+          <Tally score={score} t={t} />
         </div>
         <div className="seat__meta">
           <span>
@@ -298,7 +298,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
         {seat(LUCHO)}
       </section>
 
-      <section className="rim" aria-label="Mesa">
+      <section className="rim" aria-label={t.table}>
         <div className="felt">
           <div className="felt__status">
             <span>{t.deal(Math.max(game.deal, 1), DEALS_PER_HAND)}</span>
@@ -373,7 +373,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
                   onBlur={() => hoverCard(null)}
                 >
                   <CardFace card={c} lang={lang} />
-                  {tag && <span className={`hand__tag hand__tag--${tag}`}>{tag === "caida" ? "¡Caída!" : "+"}</span>}
+                  {tag && <span className={`hand__tag hand__tag--${tag}`}>{tag === "caida" ? t.caidaTag : "+"}</span>}
                 </button>
               );
             })}
@@ -469,7 +469,7 @@ export function Mesa({ initial, lang, resumed, onChange, onNewMesa }: MesaProps)
                   <div key={p} className="result__score">
                     <span className="result__name">{name(p)}</span>
                     <span className="result__points">{game.scores[p]}</span>
-                    <Tally score={game.scores[p]} />
+                    <Tally score={game.scores[p]} t={t} />
                     <ChicaDots won={game.chicas[p]} label={t.chicas} />
                   </div>
                 ))}
