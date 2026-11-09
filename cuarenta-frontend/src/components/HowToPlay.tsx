@@ -165,7 +165,8 @@ export default function HowToPlayModal({ open, lang, onClose }: Props) {
           <h3>At this table</h3>
           <p>
             If your card can capture, it captures. If there's more than one way, you pick. The escalera is taken for
-            you.
+            you. Plays keep their Spanish names in the Plays list and when you pick a capture. The Points table above
+            says what each one means.
           </p>
           <h3>Talk like Don Lucho</h3>
           <dl className="slang">
