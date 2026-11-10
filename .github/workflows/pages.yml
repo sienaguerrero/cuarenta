@@ -26,7 +26,8 @@ jobs:
       - run: npm test
       - run: npm run lint
       - run: npm run build
-      - id: soon
+      - if: github.ref == 'refs/heads/main'
+        id: soon
         uses: sienaguerrero/coming-soon@v1
         with:
           path: cuarenta-frontend/dist
