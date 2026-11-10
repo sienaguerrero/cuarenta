@@ -351,7 +351,7 @@ describe("chica and mesa", () => {
   });
 });
 
-describe("Don Lucho", () => {
+describe("El Guapo", () => {
   it("does not count your own hand as unseen", () => {
     const s = stateWith({
       hands: [cards("5S", "KD"), cards("2C", "3C")],

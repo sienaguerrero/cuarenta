@@ -63,7 +63,7 @@ export const LINES: Record<Mood, Line[]> = {
   ],
   myRonda: [
     { es: "¡Ronda! Y no te digo de qué.", en: "Ronda! And I'm not saying which." },
-    { es: "Ronda para Don Lucho. Cuídate.", en: "Ronda for Don Lucho. Watch yourself." },
+    { es: "Ronda para El Guapo. Cuídate.", en: "Ronda for El Guapo. Watch yourself." },
   ],
   myDobleRonda: [
     { es: "¡Doble ronda! Las cuatro, pana. La chica es mía.", en: "Doble ronda! All four, friend. The chica's mine." },
@@ -100,7 +100,7 @@ export const LINES: Record<Mood, Line[]> = {
     { es: "Ya pues, ganaste esta. La próxima es mía.", en: "Alright then, you won this one. The next one's mine." },
   ],
   winMesa: [
-    { es: "¡Mesa para Don Lucho! Gracias por jugar, pana.", en: "The mesa goes to Don Lucho! Thanks for playing, friend." },
+    { es: "¡Mesa para El Guapo! Gracias por jugar, pana.", en: "The mesa goes to El Guapo! Thanks for playing, friend." },
   ],
   loseMesa: [
     { es: "¡Me ganaste la mesa! Juegas bacán.", en: "You beat me for the mesa! You play great." },
