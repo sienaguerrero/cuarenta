@@ -100,7 +100,7 @@ export default function HowToPlayModal({ open, lang, onClose }: Props) {
           <p>
             Si tu carta puede llevar, lleva. Si hay varias formas de llevar, eliges tú. La escalera se toma sola.
           </p>
-          <h3>Habla como Don Lucho</h3>
+          <h3>Habla como El Guapo</h3>
           <dl className="slang">
             {SLANG.map((s) => (
               <div key={s.word}>
@@ -168,7 +168,7 @@ export default function HowToPlayModal({ open, lang, onClose }: Props) {
             you. Plays keep their Spanish names in the Plays list and when you pick a capture. The Points table above
             says what each one means.
           </p>
-          <h3>Talk like Don Lucho</h3>
+          <h3>Talk like El Guapo</h3>
           <dl className="slang">
             {SLANG.map((s) => (
               <div key={s.word}>

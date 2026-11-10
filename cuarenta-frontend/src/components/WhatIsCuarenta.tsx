@@ -26,7 +26,7 @@ export default function WhatIsCuarentaModal({ open, lang, onClose }: Props) {
             vacía.
           </p>
           <p>
-            Se juega de dos, o de cuatro en parejas. Aquí juegas mano a mano contra Don Lucho. Él usa sombrero de paja
+            Se juega de dos, o de cuatro en parejas. Aquí juegas mano a mano contra El Guapo. Él usa sombrero de paja
             toquilla.
           </p>
           <h3>Tantos y perros</h3>
@@ -54,7 +54,7 @@ export default function WhatIsCuarentaModal({ open, lang, onClose }: Props) {
             means you take the card your rival just played. A limpia means you clear the table.
           </p>
           <p>
-            It's played by two, or by four in teams. Here you play head to head against Don Lucho. He wears a paja
+            It's played by two, or by four in teams. Here you play head to head against El Guapo. He wears a paja
             toquilla, the straw hat most people call a Panama hat.
           </p>
           <h3>Tantos and perros</h3>
